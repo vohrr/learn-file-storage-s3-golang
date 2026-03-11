@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -28,10 +30,55 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
-	// TODO: implement the upload here
+	err = r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't parse multi-part form", err)
+		return
+	}
+	imageData, imageHeader, err := r.FormFile("thumbnail")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't parse formFile", err)
+		return
+	}
 
-	respondWithJSON(w, http.StatusOK, struct{}{})
+	imageType := imageHeader.Header.Get("Content-Type")
+	fmt.Printf("Content-Type: %s", imageType)
+
+	imageDataSlice, err := io.ReadAll(imageData)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't parse thumbnail data into []byte", err)
+		return
+	}
+
+	videoMetadata, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Video not found", err)
+		return
+	}
+	if videoMetadata.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "Not authorized for this action", err)
+		return
+	}
+
+	if _, ok := videoThumbnails[videoID]; !ok {
+		videoThumbnails[videoID] = thumbnail{
+			data:      imageDataSlice,
+			mediaType: imageType,
+		}
+	} else {
+		respondWithError(w, http.StatusBadRequest, "This file has already been uploaded", err)
+		return
+	}
+
+	newUrl := fmt.Sprintf("http://localhost:8091/api/thumbnails/%s", videoIDString)
+	videoMetadata.UpdatedAt = time.Now()
+	videoMetadata.ThumbnailURL = &newUrl
+	err = cfg.db.UpdateVideo(videoMetadata)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't update thumbnail metadata", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, videoMetadata)
 }
