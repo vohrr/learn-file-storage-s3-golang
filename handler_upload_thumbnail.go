@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,17 +63,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if _, ok := videoThumbnails[videoID]; !ok {
-		videoThumbnails[videoID] = thumbnail{
-			data:      imageDataSlice,
-			mediaType: imageType,
-		}
-	} else {
-		respondWithError(w, http.StatusBadRequest, "This file has already been uploaded", err)
-		return
-	}
-
-	newUrl := fmt.Sprintf("http://localhost:8091/api/thumbnails/%s", videoIDString)
+	newUrl := fmt.Sprintf("data:%s;base64,%s", imageType, base64.StdEncoding.EncodeToString(imageDataSlice))
 	videoMetadata.UpdatedAt = time.Now()
 	videoMetadata.ThumbnailURL = &newUrl
 	err = cfg.db.UpdateVideo(videoMetadata)
