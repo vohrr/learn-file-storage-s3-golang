@@ -1,10 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -45,14 +48,15 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	imageType := imageHeader.Header.Get("Content-Type")
-	fmt.Printf("Content-Type: %s", imageType)
-
-	imageDataSlice, err := io.ReadAll(imageData)
+	mediaType, _, err := mime.ParseMediaType(imageType)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't parse thumbnail data into []byte", err)
+		respondWithError(w, http.StatusBadRequest, "Failed to parse mime type", err)
 		return
 	}
-
+	if mediaType != "image/jpeg" && mediaType != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "Invalid file type", err)
+		return
+	}
 	videoMetadata, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Video not found", err)
@@ -63,9 +67,34 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	newUrl := fmt.Sprintf("data:%s;base64,%s", imageType, base64.StdEncoding.EncodeToString(imageDataSlice))
+	//create file on disk
+	var fileExtension string
+	imageTypeSlice := strings.Split(imageType, "/")
+	if len(imageTypeSlice) == 2 {
+		fileExtension = imageTypeSlice[1]
+	} else {
+		fileExtension = imageType
+
+	}
+	fileName := fmt.Sprintf("%s.%s", videoIDString, fileExtension)
+	filePath := filepath.Join(cfg.assetsRoot, fileName)
+	thumbnailFile, err := os.Create(filePath)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to save thumbnail file", err)
+		return
+
+	}
+	//write data to file
+	_, err = io.Copy(thumbnailFile, imageData)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to save thumbnail file", err)
+		return
+	}
+
+	//update metadata with url
+	thumbnailUrl := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, fileName)
 	videoMetadata.UpdatedAt = time.Now()
-	videoMetadata.ThumbnailURL = &newUrl
+	videoMetadata.ThumbnailURL = &thumbnailUrl
 	err = cfg.db.UpdateVideo(videoMetadata)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldn't update thumbnail metadata", err)
