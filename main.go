@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 
 	"github.com/joho/godotenv"
@@ -21,11 +24,11 @@ type apiConfig struct {
 	s3Region         string
 	s3CfDistribution string
 	port             string
+	s3Client         *s3.Client
 }
 
 func main() {
 	godotenv.Load(".env")
-
 	pathToDB := os.Getenv("DB_PATH")
 	if pathToDB == "" {
 		log.Fatal("DB_URL must be set")
@@ -75,7 +78,8 @@ func main() {
 	if port == "" {
 		log.Fatal("PORT environment variable is not set")
 	}
-
+	config_s3, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(s3Region))
+	client_s3 := s3.NewFromConfig(config_s3)
 	cfg := apiConfig{
 		db:               db,
 		jwtSecret:        jwtSecret,
@@ -86,6 +90,7 @@ func main() {
 		s3Region:         s3Region,
 		s3CfDistribution: s3CfDistribution,
 		port:             port,
+		s3Client:         client_s3,
 	}
 
 	err = cfg.ensureAssetsDir()
@@ -122,4 +127,18 @@ func main() {
 
 	log.Printf("Serving on: http://localhost:%s/app/\n", port)
 	log.Fatal(srv.ListenAndServe())
+}
+
+type AlloyRequest struct {
+	Method  string            `json:"method"`
+	UserID  string            `json:"user_id"`
+	Url     string            `json:"url"`
+	Payload map[string]string `json:"payload"`
+}
+
+type AlloyResponse struct {
+	Success    bool              `json:"success"`
+	StatusCode int               `json:"status_code"`
+	Message    string            `json:"message"`
+	Data       map[string]string `json:"data"`
 }
