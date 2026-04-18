@@ -128,17 +128,3 @@ func main() {
 	log.Printf("Serving on: http://localhost:%s/app/\n", port)
 	log.Fatal(srv.ListenAndServe())
 }
-
-type AlloyRequest struct {
-	Method  string            `json:"method"`
-	UserID  string            `json:"user_id"`
-	Url     string            `json:"url"`
-	Payload map[string]string `json:"payload"`
-}
-
-type AlloyResponse struct {
-	Success    bool              `json:"success"`
-	StatusCode int               `json:"status_code"`
-	Message    string            `json:"message"`
-	Data       map[string]string `json:"data"`
-}
