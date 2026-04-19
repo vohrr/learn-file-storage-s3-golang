@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
+	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/ffmpeg"
 	"github.com/google/uuid"
 )
 
@@ -76,13 +77,28 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	tempFile.Seek(0, io.SeekStart)
 
+	filePath := tempFile.Name()
+	aspectRatio, err := ffmpeg.GetVideoAspectRatio(filePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to inspect video", err)
+		return
+	}
+	var prefix string
+	if aspectRatio == "16:9" {
+		prefix = "landscape"
+	} else if aspectRatio == "9:16" {
+		prefix = "portrait"
+	} else {
+		prefix = "other"
+	}
+
 	keyHex := make([]byte, 32)
 	_, err = rand.Read(keyHex)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Video not found", err)
 		return
 	}
-	key := hex.EncodeToString(keyHex)
+	key := fmt.Sprintf("%s/%s", prefix, hex.EncodeToString(keyHex))
 	//create object input and push to  s3 client
 	params := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
