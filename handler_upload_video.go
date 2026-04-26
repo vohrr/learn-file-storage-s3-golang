@@ -62,6 +62,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Failed to parse mime type", err)
 		return
 	}
+
 	if mediaType != "video/mp4" {
 		respondWithError(w, http.StatusBadRequest, "Invalid file type", err)
 		return
@@ -83,6 +84,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Failed to inspect video", err)
 		return
 	}
+
 	var prefix string
 	if aspectRatio == "16:9" {
 		prefix = "landscape"
@@ -91,6 +93,20 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	} else {
 		prefix = "other"
 	}
+
+	processingFilePath, err := ffmpeg.ProcessVideoForFastStart(filePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to convert video for fast processing", err)
+		return
+	}
+	fastProcessFile, err := os.Open(processingFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to open fast processing file", err)
+		return
+	}
+
+	defer os.Remove(processingFilePath)
+	defer fastProcessFile.Close()
 
 	keyHex := make([]byte, 32)
 	_, err = rand.Read(keyHex)
@@ -103,7 +119,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	params := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &key,
-		Body:        tempFile,
+		Body:        fastProcessFile,
 		ContentType: &mediaType,
 	}
 	_, err = cfg.s3Client.PutObject(r.Context(), &params)

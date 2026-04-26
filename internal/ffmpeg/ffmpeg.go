@@ -8,6 +8,19 @@ import (
 	"os/exec"
 )
 
+func ProcessVideoForFastStart(filePath string) (string, error) {
+	//might need to guard against the file extension here, not sure
+	outputPath := filePath + ".processing"
+	args := []string{"-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", outputPath}
+	cmd := exec.Command("ffmpeg", args...)
+
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	return outputPath, nil
+}
+
 func GetVideoAspectRatio(filePath string) (string, error) {
 	args := []string{"-v", "error", "-print_format", "json", "-show_streams", filePath}
 
