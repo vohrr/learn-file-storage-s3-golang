@@ -115,7 +115,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	key := fmt.Sprintf("%s/%s", prefix, hex.EncodeToString(keyHex))
-	//create object input and push to  s3 client
+	//create object input and push to s3 client
 	params := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &key,
@@ -129,16 +129,16 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	//update video metadata
-	videoMetadata.VideoURL = MakeVideoURL(cfg, key)
+	videoMetadata.VideoURL = makeVideoURL(cfg, key)
 	err = cfg.db.UpdateVideo(videoMetadata)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update Video URL", err)
 		return
 	}
-
 }
 
-func MakeVideoURL(cfg *apiConfig, key string) *string {
-	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
+func makeVideoURL(cfg *apiConfig, key string) *string {
+	//url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
+	url := fmt.Sprintf("%s,%s", cfg.s3Bucket, key)
 	return &url
 }
