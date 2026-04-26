@@ -1,34 +1,29 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"net/http"
-	"strings"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 	"github.com/google/uuid"
+	"net/http"
 )
 
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-
-	if video.VideoURL != nil {
-		urlParts := strings.Split(*video.VideoURL, ",")
-		bucket := urlParts[0]
-		key := urlParts[1]
-
-		signedUrl, err := generatePresignedURL(cfg.s3Client, bucket, key, time.Duration(time.Minute*60))
-		if err != nil {
-			return video, err
-		}
-
-		video.VideoURL = &signedUrl
-	}
-	return video, nil
-}
+// func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
+//
+// 	if video.VideoURL != nil {
+// 		urlParts := strings.Split(*video.VideoURL, ",")
+// 		bucket := urlParts[0]
+// 		key := urlParts[1]
+//
+// 		signedUrl, err := generatePresignedURL(cfg.s3Client, bucket, key, time.Duration(time.Minute*60))
+// 		if err != nil {
+// 			return video, err
+// 		}
+//
+// 		video.VideoURL = &signedUrl
+// 	}
+// 	return video, nil
+// }
 
 func (cfg *apiConfig) handlerVideoMetaCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
@@ -115,11 +110,6 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusNotFound, "Couldn't get video", err)
 		return
 	}
-	video, err = cfg.dbVideoToSignedVideo(video)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to get signed Video URL", err)
-		return
-	}
 
 	respondWithJSON(w, http.StatusOK, video)
 }
@@ -141,27 +131,20 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve videos", err)
 		return
 	}
-	for i := range videos {
-		videos[i], err = cfg.dbVideoToSignedVideo(videos[i])
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Failed to get signed Video URL", err)
-			return
-		}
-	}
 
 	respondWithJSON(w, http.StatusOK, videos)
 }
 
-func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
-	funcOptions := s3.WithPresignExpires(expireTime)
-	presign := s3.NewPresignClient(s3Client)
-	params := s3.GetObjectInput{
-		Bucket: &bucket,
-		Key:    &key,
-	}
-	request, err := presign.PresignGetObject(context.TODO(), &params, funcOptions)
-	if err != nil {
-		return "", err
-	}
-	return request.URL, nil
-}
+// func generatePresignedURL(s3Client *s3.Client, bucket, key string, expireTime time.Duration) (string, error) {
+// 	funcOptions := s3.WithPresignExpires(expireTime)
+// 	presign := s3.NewPresignClient(s3Client)
+// 	params := s3.GetObjectInput{
+// 		Bucket: &bucket,
+// 		Key:    &key,
+// 	}
+// 	request, err := presign.PresignGetObject(context.TODO(), &params, funcOptions)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	return request.URL, nil
+// }
